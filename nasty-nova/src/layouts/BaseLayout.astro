@@ -1,0 +1,36 @@
+---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+
+const {
+  title = "Vishal After Hours",
+  description = "Thoughts on Java, AI, backend engineering, AWS and distributed systems."
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <link rel="icon" href="/favicon.svg" />
+  </head>
+
+  <body>
+    <Header />
+
+    <main>
+      <slot />
+    </main>
+
+    <footer>
+      <div class="container">
+        © {new Date().getFullYear()} Vishal After Hours
+      </div>
+    </footer>
+  </body>
+</html>

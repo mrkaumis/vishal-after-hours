@@ -1,0 +1,439 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import QRCode from "qrcode";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("blog");
+
+  return posts.map((post) => ({
+    params: {
+      slug: post.id,
+    },
+    props: {
+      post,
+    },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+
+const articleUrl = `https://vishalafterhours.in/blog/${post.id}`;
+
+const qrCode = await QRCode.toString(articleUrl, {
+  type: "svg",
+  errorCorrectionLevel: "M",
+  margin: 2,
+});
+---
+
+<BaseLayout
+  title={`${post.data.title} — Vishal After Hours`}
+  description={post.data.description}
+>
+  <article class="article">
+
+    <div class="article-header">
+
+      <div class="post-meta">
+        {post.data.tags.join(" · ").toUpperCase()}
+      </div>
+
+      <h1>{post.data.title}</h1>
+
+      <p class="article-description">
+        {post.data.description}
+      </p>
+
+      <div class="post-meta">
+        {post.data.pubDate.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}
+      </div>
+
+    </div>
+
+    <!-- LIKE -->
+
+    <div class="like-box">
+      <button id="like-button" type="button">
+        ❤️ Like <span id="like-count">0</span>
+      </button>
+    </div>
+
+    <!-- ARTICLE -->
+
+    <div class="article-content">
+      <Content />
+    </div>
+
+    <!-- QR CODE -->
+
+    <section class="qr-section">
+
+      <div
+        class="qr-code"
+        set:html={qrCode}
+      ></div>
+
+      <div class="qr-content">
+
+        <p class="qr-label">
+          READ ON YOUR PHONE
+        </p>
+
+        <h2>
+          Continue reading on mobile
+        </h2>
+
+        <p>
+          Scan the QR code with your phone camera
+          to open this article on your mobile.
+        </p>
+
+      </div>
+
+    </section>
+
+    <!-- COMMENTS -->
+
+    <section class="comments">
+
+      <h2>Comments</h2>
+
+      <form id="comment-form">
+
+        <div class="comment-field">
+
+          <label for="comment-name">
+            Name
+          </label>
+
+          <input
+            id="comment-name"
+            name="name"
+            type="text"
+            maxlength="100"
+            placeholder="Your name"
+            required
+          />
+
+        </div>
+
+        <div class="comment-field">
+
+          <label for="comment-text">
+            Comment
+          </label>
+
+          <textarea
+            id="comment-text"
+            name="comment"
+            maxlength="500"
+            rows="5"
+            placeholder="Write your comment..."
+            required
+          ></textarea>
+
+        </div>
+
+        <button
+          id="comment-submit"
+          type="submit"
+        >
+          Post Comment
+        </button>
+
+        <p id="comment-message"></p>
+
+      </form>
+
+      <div id="comments-list"></div>
+
+    </section>
+
+  </article>
+</BaseLayout>
+
+<!-- LIKE SCRIPT -->
+
+<script define:vars={{
+  apiUrl: import.meta.env.PUBLIC_LIKES_API_URL,
+  blogId: post.id
+}}>
+  const likeButton =
+    document.getElementById("like-button");
+
+  const likeCount =
+    document.getElementById("like-count");
+
+  async function loadLikes() {
+    try {
+      const response =
+        await fetch(`${apiUrl}/likes/${blogId}`);
+
+      const data =
+        await response.json();
+
+      likeCount.textContent =
+        data.likes;
+
+    } catch (error) {
+      console.error(
+        "Failed to load likes:",
+        error
+      );
+    }
+  }
+
+  likeButton?.addEventListener(
+    "click",
+    async () => {
+
+      try {
+        const response =
+          await fetch(
+            `${apiUrl}/likes/${blogId}`,
+            {
+              method: "POST"
+            }
+          );
+
+        const data =
+          await response.json();
+
+        likeCount.textContent =
+          data.likes;
+
+      } catch (error) {
+        console.error(
+          "Failed to like:",
+          error
+        );
+      }
+
+    }
+  );
+
+  loadLikes();
+</script>
+
+<!-- COMMENTS SCRIPT -->
+
+<script define:vars={{
+  commentsApiUrl: import.meta.env.PUBLIC_COMMENTS_API_URL,
+  blogId: post.id
+}}>
+  const commentForm =
+    document.getElementById("comment-form");
+
+  const commentName =
+    document.getElementById("comment-name");
+
+  const commentText =
+    document.getElementById("comment-text");
+
+  const commentSubmit =
+    document.getElementById("comment-submit");
+
+  const commentMessage =
+    document.getElementById("comment-message");
+
+  const commentsList =
+    document.getElementById("comments-list");
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function renderComments(comments) {
+
+    if (!comments.length) {
+
+      commentsList.innerHTML =
+        '<p class="no-comments">No comments yet. Be the first to comment.</p>';
+
+      return;
+    }
+
+    commentsList.innerHTML =
+      comments
+        .map((item) => `
+          <div class="comment">
+
+            <div class="comment-name">
+              ${escapeHtml(
+                item.name || "Anonymous"
+              )}
+            </div>
+
+            <div class="comment-text">
+              ${escapeHtml(
+                (item.comment || "").trim()
+              )}
+            </div>
+
+            <div class="comment-date">
+              ${new Date(
+                item.createdAt
+              ).toLocaleDateString(
+                "en-US",
+                {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric"
+                }
+              )}
+            </div>
+
+          </div>
+        `)
+        .join("");
+  }
+
+  async function loadComments() {
+
+    try {
+
+      const response =
+        await fetch(
+          `${commentsApiUrl}/comments/${blogId}`
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}`
+        );
+      }
+
+      const data =
+        await response.json();
+
+      renderComments(
+        data.comments || []
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to load comments:",
+        error
+      );
+
+      commentsList.innerHTML =
+        '<p class="no-comments">Unable to load comments.</p>';
+    }
+  }
+
+  commentForm?.addEventListener(
+    "submit",
+    async (event) => {
+
+      event.preventDefault();
+
+      const name =
+        commentName.value.trim();
+
+      const comment =
+        commentText.value.trim();
+
+      if (!name || !comment) {
+
+        commentMessage.textContent =
+          "Please enter your name and comment.";
+
+        return;
+      }
+
+      if (name.length > 100) {
+
+        commentMessage.textContent =
+          "Name must be 100 characters or less.";
+
+        return;
+      }
+
+      if (comment.length > 500) {
+
+        commentMessage.textContent =
+          "Comment must be 500 characters or less.";
+
+        return;
+      }
+
+      commentSubmit.disabled = true;
+
+      commentSubmit.textContent =
+        "Posting...";
+
+      commentMessage.textContent = "";
+
+      try {
+
+        const response =
+          await fetch(
+            `${commentsApiUrl}/comments/${blogId}`,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+                name,
+                comment
+              })
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+
+          commentMessage.textContent =
+            data.error ||
+            "Unable to post comment.";
+
+          return;
+        }
+
+        commentForm.reset();
+
+        commentMessage.textContent =
+          "Comment posted.";
+
+        await loadComments();
+
+      } catch (error) {
+
+        console.error(
+          "Failed to submit comment:",
+          error
+        );
+
+        commentMessage.textContent =
+          "Unable to post comment. Please try again.";
+
+      } finally {
+
+        commentSubmit.disabled = false;
+
+        commentSubmit.textContent =
+          "Post Comment";
+      }
+    }
+  );
+
+  loadComments();
+</script>
